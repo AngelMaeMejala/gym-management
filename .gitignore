@@ -1,0 +1,12 @@
+node_modules/
+dist/
+.env
+.env.*
+!.env.example
+*.log
+.gym-db/
+.npm-cache/
+.gym-browser/
+.gym-uploads/
+postman/*Local*.postman_environment.json
+

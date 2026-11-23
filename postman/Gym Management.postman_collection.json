@@ -1,0 +1,76 @@
+{
+  "info": {
+    "name": "Gym Management API",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
+    "description": "Run requests in order against a disposable database. Login stores the token. Create requests store resource IDs. The sample account is deactivated during cleanup."
+  },
+  "auth": {
+    "type": "bearer",
+    "bearer": [
+      {
+        "key": "token",
+        "value": "{{accessToken}}",
+        "type": "string"
+      }
+    ]
+  },
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:3000/api/v1"
+    },
+    {
+      "key": "accessToken",
+      "value": ""
+    },
+    {
+      "key": "scheduleId",
+      "value": ""
+    },
+    {
+      "key": "equipmentId",
+      "value": ""
+    },
+    {
+      "key": "inventoryId",
+      "value": ""
+    },
+    {
+      "key": "notificationId",
+      "value": ""
+    },
+    {
+      "key": "userId",
+      "value": ""
+    },
+    {
+      "key": "sampleEmail",
+      "value": ""
+    },
+    {
+      "key": "samplePassword",
+      "value": ""
+    }
+  ],
+  "item": [
+    {"name":"Log in","request":{"method":"POST","url":"{{baseUrl}}/auth/login","auth":{"type":"noauth"},"header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","pm.collectionVariables.set('accessToken', pm.response.json().accessToken); const id = pm.variables.replaceIn('{{$guid}}'); pm.collectionVariables.set('sampleEmail', id + '@gym.local'); pm.collectionVariables.set('samplePassword', id);"]}}]},
+    {"name":"My account","request":{"method":"GET","url":"{{baseUrl}}/auth/me"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","pm.test('No password in response', () => pm.expect(pm.response.json()).not.to.have.property('password'));"]}}]},
+    {"name":"Dashboard","request":{"method":"GET","url":"{{baseUrl}}/dashboard"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"Create member","request":{"method":"POST","url":"{{baseUrl}}/users","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"firstName\": \"Sample\",\n  \"lastName\": \"Member\",\n  \"email\": \"{{sampleEmail}}\",\n  \"password\": \"{{samplePassword}}\",\n  \"role\": \"MEMBER\",\n  \"accountStatus\": \"ACTIVE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('userId', pm.response.json().userId);"]}}]},
+    {"name":"List users","request":{"method":"GET","url":"{{baseUrl}}/users"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"Create schedule","request":{"method":"POST","url":"{{baseUrl}}/schedules","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"activityName\": \"Mobility class\",\n  \"scheduleDate\": \"2098-10-10\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('scheduleId', pm.response.json().scheduleId);"]}}]},
+    {"name":"Reject overlapping schedule","request":{"method":"POST","url":"{{baseUrl}}/schedules","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"activityName\": \"Mobility class\",\n  \"scheduleDate\": \"2098-10-10\",\n  \"startTime\": \"09:30\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 409', () => pm.response.to.have.status(409));"]}}]},
+    {"name":"Update schedule","request":{"method":"PUT","url":"{{baseUrl}}/schedules/{{scheduleId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"activityName\": \"Mobility and stretching\",\n  \"scheduleDate\": \"2098-10-10\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"List schedules","request":{"method":"GET","url":"{{baseUrl}}/schedules"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"List notifications","request":{"method":"GET","url":"{{baseUrl}}/notifications"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","const n = pm.response.json().find(item => item.scheduleId === Number(pm.collectionVariables.get('scheduleId'))); if (n) pm.collectionVariables.set('notificationId', n.notificationId);"]}}]},
+    {"name":"Mark notification read","request":{"method":"PATCH","url":"{{baseUrl}}/notifications/{{notificationId}}/read"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"Create equipment","request":{"method":"POST","url":"{{baseUrl}}/equipment","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"equipmentName\": \"Kettlebell\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"GOOD\",\n  \"availabilityStatus\": \"AVAILABLE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('equipmentId', pm.response.json().equipmentId);"]}}]},
+    {"name":"List equipment","request":{"method":"GET","url":"{{baseUrl}}/equipment"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"Update equipment","request":{"method":"PUT","url":"{{baseUrl}}/equipment/{{equipmentId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"equipmentName\": \"Kettlebell\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"GOOD\",\n  \"availabilityStatus\": \"MAINTENANCE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"List inventory","request":{"method":"GET","url":"{{baseUrl}}/inventory"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","const row = pm.response.json().find(i => i.equipmentId === Number(pm.collectionVariables.get('equipmentId'))); if (row) pm.collectionVariables.set('inventoryId', row.inventoryId);"]}}]},
+    {"name":"Update quantity","request":{"method":"PATCH","url":"{{baseUrl}}/inventory/{{inventoryId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"quantity\": 5\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
+    {"name":"Delete equipment","request":{"method":"DELETE","url":"{{baseUrl}}/equipment/{{equipmentId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 204', () => pm.response.to.have.status(204));"]}}]},
+    {"name":"Delete schedule","request":{"method":"DELETE","url":"{{baseUrl}}/schedules/{{scheduleId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 204', () => pm.response.to.have.status(204));"]}}]},
+    {"name":"Deactivate member","request":{"method":"PUT","url":"{{baseUrl}}/users/{{userId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"firstName\": \"Sample\",\n  \"lastName\": \"Member\",\n  \"email\": \"{{sampleEmail}}\",\n  \"role\": \"MEMBER\",\n  \"accountStatus\": \"INACTIVE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]}
+  ]
+}
