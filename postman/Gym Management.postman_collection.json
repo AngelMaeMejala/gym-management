@@ -1,15 +1,15 @@
 {
   "info": {
-    "name": "Gym Management API",
+    "name": "FitZone Gym Management API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run requests in order against a disposable database. Login stores the token. Create requests store resource IDs. The sample account is deactivated during cleanup."
+    "description": "Run in order from the project root against a disposable database. Set adminEmail and adminPassword as private environment values. The collection creates test records and uploads a fictional fixture."
   },
   "auth": {
     "type": "bearer",
     "bearer": [
       {
         "key": "token",
-        "value": "{{accessToken}}",
+        "value": "{{adminToken}}",
         "type": "string"
       }
     ]
@@ -20,58 +20,1602 @@
       "value": "http://localhost:3000/api/v1"
     },
     {
-      "key": "accessToken",
+      "key": "adminEmail",
       "value": ""
     },
     {
-      "key": "scheduleId",
-      "value": ""
-    },
-    {
-      "key": "equipmentId",
-      "value": ""
-    },
-    {
-      "key": "inventoryId",
-      "value": ""
-    },
-    {
-      "key": "notificationId",
-      "value": ""
-    },
-    {
-      "key": "userId",
-      "value": ""
-    },
-    {
-      "key": "sampleEmail",
-      "value": ""
-    },
-    {
-      "key": "samplePassword",
+      "key": "adminPassword",
       "value": ""
     }
   ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "const future = new Date(Date.now() + 7 * 86400000);",
+          "pm.collectionVariables.set(\"testDate\", future.toISOString().slice(0, 10));"
+        ]
+      }
+    }
+  ],
   "item": [
-    {"name":"Log in","request":{"method":"POST","url":"{{baseUrl}}/auth/login","auth":{"type":"noauth"},"header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","pm.collectionVariables.set('accessToken', pm.response.json().accessToken); const id = pm.variables.replaceIn('{{$guid}}'); pm.collectionVariables.set('sampleEmail', id + '@gym.local'); pm.collectionVariables.set('samplePassword', id);"]}}]},
-    {"name":"My account","request":{"method":"GET","url":"{{baseUrl}}/auth/me"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","pm.test('No password in response', () => pm.expect(pm.response.json()).not.to.have.property('password'));"]}}]},
-    {"name":"Dashboard","request":{"method":"GET","url":"{{baseUrl}}/dashboard"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"Create member","request":{"method":"POST","url":"{{baseUrl}}/users","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"firstName\": \"Sample\",\n  \"lastName\": \"Member\",\n  \"email\": \"{{sampleEmail}}\",\n  \"password\": \"{{samplePassword}}\",\n  \"role\": \"MEMBER\",\n  \"accountStatus\": \"ACTIVE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('userId', pm.response.json().userId);"]}}]},
-    {"name":"List users","request":{"method":"GET","url":"{{baseUrl}}/users"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"Create schedule","request":{"method":"POST","url":"{{baseUrl}}/schedules","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"activityName\": \"Mobility class\",\n  \"scheduleDate\": \"2098-10-10\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('scheduleId', pm.response.json().scheduleId);"]}}]},
-    {"name":"Reject overlapping schedule","request":{"method":"POST","url":"{{baseUrl}}/schedules","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"activityName\": \"Mobility class\",\n  \"scheduleDate\": \"2098-10-10\",\n  \"startTime\": \"09:30\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 409', () => pm.response.to.have.status(409));"]}}]},
-    {"name":"Update schedule","request":{"method":"PUT","url":"{{baseUrl}}/schedules/{{scheduleId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"activityName\": \"Mobility and stretching\",\n  \"scheduleDate\": \"2098-10-10\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"List schedules","request":{"method":"GET","url":"{{baseUrl}}/schedules"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"List notifications","request":{"method":"GET","url":"{{baseUrl}}/notifications"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","const n = pm.response.json().find(item => item.scheduleId === Number(pm.collectionVariables.get('scheduleId'))); if (n) pm.collectionVariables.set('notificationId', n.notificationId);"]}}]},
-    {"name":"Mark notification read","request":{"method":"PATCH","url":"{{baseUrl}}/notifications/{{notificationId}}/read"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"Create equipment","request":{"method":"POST","url":"{{baseUrl}}/equipment","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"equipmentName\": \"Kettlebell\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"GOOD\",\n  \"availabilityStatus\": \"AVAILABLE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('equipmentId', pm.response.json().equipmentId);"]}}]},
-    {"name":"List equipment","request":{"method":"GET","url":"{{baseUrl}}/equipment"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"Update equipment","request":{"method":"PUT","url":"{{baseUrl}}/equipment/{{equipmentId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"equipmentName\": \"Kettlebell\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"GOOD\",\n  \"availabilityStatus\": \"MAINTENANCE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"List inventory","request":{"method":"GET","url":"{{baseUrl}}/inventory"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","const row = pm.response.json().find(i => i.equipmentId === Number(pm.collectionVariables.get('equipmentId'))); if (row) pm.collectionVariables.set('inventoryId', row.inventoryId);"]}}]},
-    {"name":"Update quantity","request":{"method":"PATCH","url":"{{baseUrl}}/inventory/{{inventoryId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"quantity\": 5\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"Delete equipment","request":{"method":"DELETE","url":"{{baseUrl}}/equipment/{{equipmentId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 204', () => pm.response.to.have.status(204));"]}}]},
-    {"name":"Delete schedule","request":{"method":"DELETE","url":"{{baseUrl}}/schedules/{{scheduleId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 204', () => pm.response.to.have.status(204));"]}}]},
-    {"name":"Deactivate member","request":{"method":"PUT","url":"{{baseUrl}}/users/{{userId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"firstName\": \"Sample\",\n  \"lastName\": \"Member\",\n  \"email\": \"{{sampleEmail}}\",\n  \"role\": \"MEMBER\",\n  \"accountStatus\": \"INACTIVE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},
-    {"name":"Supplier Management","item":[{"name":"Create supplier","request":{"method":"POST","url":"{{baseUrl}}/suppliers","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"supplierName\": \"Test Supplier {{$guid}}\",\n  \"email\": \"supplier@example.test\",\n  \"phone\": \"+63 555 0100\",\n  \"contactPerson\": \"Demo Contact\",\n  \"address\": \"100 Demo Lane, Sample City\",\n  \"status\": \"ACTIVE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","const supplier = pm.response.json(); pm.collectionVariables.set('supplierId', supplier.supplierId); pm.collectionVariables.set('supplierName', supplier.supplierName);"]}}]},{"name":"List suppliers","request":{"method":"GET","url":"{{baseUrl}}/suppliers"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","pm.test('Created supplier appears', () => pm.expect(pm.response.json().some(row => row.supplierId === Number(pm.collectionVariables.get('supplierId')))).to.be.true);"]}}]},{"name":"Read supplier","request":{"method":"GET","url":"{{baseUrl}}/suppliers/{{supplierId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},{"name":"Update supplier","request":{"method":"PUT","url":"{{baseUrl}}/suppliers/{{supplierId}}","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"supplierName\": \"{{supplierName}}\",\n  \"email\": \"supplier@example.test\",\n  \"phone\": \"+63 555 0110\",\n  \"contactPerson\": \"Demo Contact\",\n  \"address\": \"100 Demo Lane, Sample City\",\n  \"status\": \"INACTIVE\"\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));"]}}]},{"name":"Create equipment with selected supplier","request":{"method":"POST","url":"{{baseUrl}}/equipment","header":[{"key":"Content-Type","value":"application/json"}],"body":{"mode":"raw","raw":"{\n  \"equipmentName\": \"Supplier verification equipment\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"GOOD\",\n  \"supplierId\": {{supplierId}}\n}"}},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 201', () => pm.response.to.have.status(201));","pm.collectionVariables.set('supplierEquipmentId', pm.response.json().equipmentId);"]}}]},{"name":"Verify supplier appears in inventory","request":{"method":"GET","url":"{{baseUrl}}/inventory"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 200', () => pm.response.to.have.status(200));","pm.test('Assigned supplier in inventory', () => pm.expect(pm.response.json().some(row => row.equipmentId === Number(pm.collectionVariables.get('supplierEquipmentId')) && row.equipment.supplier.supplierId === Number(pm.collectionVariables.get('supplierId')))).to.be.true);"]}}]},{"name":"Reject deletion of linked supplier","request":{"method":"DELETE","url":"{{baseUrl}}/suppliers/{{supplierId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 409', () => pm.response.to.have.status(409));"]}}]},{"name":"Remove supplier verification equipment","request":{"method":"DELETE","url":"{{baseUrl}}/equipment/{{supplierEquipmentId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 204', () => pm.response.to.have.status(204));"]}}]},{"name":"Delete supplier","request":{"method":"DELETE","url":"{{baseUrl}}/suppliers/{{supplierId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 204', () => pm.response.to.have.status(204));"]}}]},{"name":"Verify supplier deletion","request":{"method":"GET","url":"{{baseUrl}}/suppliers/{{supplierId}}"},"event":[{"listen":"test","script":{"type":"text/javascript","exec":["pm.test('HTTP 404', () => pm.response.to.have.status(404));"]}}]}]}
+    {
+      "name": "Authentication and account",
+      "item": [
+        {
+          "name": "Protected profile rejects anonymous requests",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject invalid login",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"invalid@example.test\",\n  \"password\": \"invalid-test-input\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 401', () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Administrator signs in",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{adminEmail}}\",\n  \"password\": \"{{adminPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"adminToken\", pm.response.json().accessToken);",
+                  "pm.collectionVariables.set(\"run\", pm.variables.replaceIn(\"{{$guid}}\"));",
+                  "pm.collectionVariables.set(\"memberPassword\", pm.variables.replaceIn(\"{{$guid}}\"));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read administrator profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"Password omitted\", () => pm.expect(!Object.hasOwn(pm.response.json(), \"password\")).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Register a member",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/register",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Member\",\n  \"email\": \"postman-{{run}}@example.test\",\n  \"password\": \"{{memberPassword}}\",\n  \"confirmPassword\": \"{{memberPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject duplicate registration",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/register",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"fullName\": \"Postman Member\",\n  \"email\": \"postman-{{run}}@example.test\",\n  \"password\": \"{{memberPassword}}\",\n  \"confirmPassword\": \"{{memberPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Member signs in",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/login",
+            "auth": {
+              "type": "noauth"
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"postman-{{run}}@example.test\",\n  \"password\": \"{{memberPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"memberToken\", pm.response.json().accessToken);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read member profile",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"Password omitted\", () => pm.expect(!Object.hasOwn(pm.response.json(), \"password\")).to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read administrator dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/dashboard"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read member dashboard",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/dashboard",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Missing profile picture",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me/profile-picture",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Upload member profile picture",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/auth/me/profile-picture",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "body": {
+              "mode": "formdata",
+              "formdata": [
+                {
+                  "key": "picture",
+                  "type": "file",
+                  "src": "postman/fixtures/profile.png"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read profile picture",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/auth/me/profile-picture",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"PNG response\", () => pm.expect(pm.response.headers.get(\"Content-Type\").includes(\"image/png\")).to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Member management",
+      "item": [
+        {
+          "name": "Create member",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/users",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Managed\",\n  \"lastName\": \"Member\",\n  \"email\": \"managed-{{run}}@example.test\",\n  \"role\": \"MEMBER\",\n  \"accountStatus\": \"ACTIVE\",\n  \"password\": \"{{memberPassword}}\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"userId\", pm.response.json().userId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List accounts",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Member cannot list accounts",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read managed member",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit member",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/users/{{userId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"firstName\": \"Managed\",\n  \"lastName\": \"Updated\",\n  \"email\": \"managed-{{run}}@example.test\",\n  \"role\": \"MEMBER\",\n  \"accountStatus\": \"ACTIVE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deactivate member",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read retained inactive member",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/users/{{userId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"Member inactive\", () => pm.expect(pm.response.json().accountStatus === \"INACTIVE\").to.be.true);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Schedules and notifications",
+      "item": [
+        {
+          "name": "Create schedule",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/schedules",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityName\": \"Postman Mobility\",\n  \"scheduleDate\": \"{{testDate}}\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"scheduleId\", pm.response.json().scheduleId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject overlapping schedule",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/schedules",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityName\": \"Postman Mobility\",\n  \"scheduleDate\": \"{{testDate}}\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List schedules",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/schedules",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "View schedule",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/schedules/{{scheduleId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update schedule",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/schedules/{{scheduleId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activityName\": \"Postman Stretching\",\n  \"scheduleDate\": \"{{testDate}}\",\n  \"startTime\": \"09:00\",\n  \"endTime\": \"10:00\",\n  \"status\": \"SCHEDULED\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read admin notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/notifications"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.collectionVariables.set(\"notificationId\", pm.response.json().find(row => row.scheduleId === Number(pm.collectionVariables.get(\"scheduleId\"))).notificationId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read member notifications",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/notifications",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Mark admin notification read",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/notifications/{{notificationId}}/read"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete schedule",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/schedules/{{scheduleId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Bookings",
+      "item": [
+        {
+          "name": "Submit booking request",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activity\": \"General Workout\",\n  \"bookingDate\": \"{{testDate}}\",\n  \"startTime\": \"12:00\",\n  \"endTime\": \"13:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"bookingId\", pm.response.json().bookingId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "View booking",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit pending booking",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activity\": \"General Workout\",\n  \"bookingDate\": \"{{testDate}}\",\n  \"startTime\": \"12:00\",\n  \"endTime\": \"13:00\",\n  \"notes\": \"Postman edit\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List admin booking queue",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List member bookings",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/bookings",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Approve booking",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/decision",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"APPROVED\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit booking for rejection",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activity\": \"General Workout\",\n  \"bookingDate\": \"{{testDate}}\",\n  \"startTime\": \"13:00\",\n  \"endTime\": \"14:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"bookingId\", pm.response.json().bookingId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject booking",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/decision",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"status\": \"REJECTED\",\n  \"reason\": \"Postman verification\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit booking for cancellation",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activity\": \"General Workout\",\n  \"bookingDate\": \"{{testDate}}\",\n  \"startTime\": \"14:00\",\n  \"endTime\": \"15:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"bookingId\", pm.response.json().bookingId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel booking through PATCH",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}/cancel",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Submit booking for removal",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/bookings",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"activity\": \"General Workout\",\n  \"bookingDate\": \"{{testDate}}\",\n  \"startTime\": \"15:00\",\n  \"endTime\": \"16:00\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"bookingId\", pm.response.json().bookingId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Cancel booking through DELETE",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/bookings/{{bookingId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Suppliers, equipment and inventory",
+      "item": [
+        {
+          "name": "List suppliers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/suppliers"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Deny member access to suppliers",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/suppliers",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 403', () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create supplier",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/suppliers",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierName\": \"Postman Supplier {{run}}\",\n  \"contactPerson\": \"Demo Contact\",\n  \"email\": \"supplier@example.test\",\n  \"phone\": \"+1 202-555-0104\",\n  \"address\": \"100 Demo Lane, Sample City\",\n  \"status\": \"ACTIVE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"supplierId\", pm.response.json().supplierId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read supplier",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Edit supplier",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"supplierName\": \"Postman Supplier {{run}}\",\n  \"contactPerson\": \"Demo Contact\",\n  \"email\": \"supplier@example.test\",\n  \"phone\": \"+1 202-555-0104\",\n  \"address\": \"100 Demo Lane, Sample City\",\n  \"status\": \"INACTIVE\"\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create linked equipment",
+          "request": {
+            "method": "POST",
+            "url": "{{baseUrl}}/equipment",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipmentName\": \"Postman Kettlebell\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"GOOD\",\n  \"supplierId\": {{supplierId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 201', () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.set(\"equipmentId\", pm.response.json().equipmentId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List equipment",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/equipment",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read equipment",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/equipment/{{equipmentId}}",
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{memberToken}}",
+                  "type": "string"
+                }
+              ]
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "List inventory and verify supplier link",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "const stock = pm.response.json().find(row => row.equipmentId === Number(pm.collectionVariables.get(\"equipmentId\")));",
+                  "pm.test(\"Supplier assignment returned\", () => pm.expect(stock && stock.equipment.supplier.supplierId === Number(pm.collectionVariables.get(\"supplierId\"))).to.be.true);",
+                  "pm.collectionVariables.set(\"inventoryId\", stock.inventoryId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read inventory record",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory/{{inventoryId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject negative quantity",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/inventory/{{inventoryId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": -1\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 400', () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update stock",
+          "request": {
+            "method": "PATCH",
+            "url": "{{baseUrl}}/inventory/{{inventoryId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"quantity\": 5\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update equipment condition",
+          "request": {
+            "method": "PUT",
+            "url": "{{baseUrl}}/equipment/{{equipmentId}}",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipmentName\": \"Postman Kettlebell\",\n  \"category\": \"Strength\",\n  \"equipmentCondition\": \"NEEDS_REPAIR\",\n  \"supplierId\": {{supplierId}}\n}"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
+                  "pm.test(\"Needs repair puts item in maintenance\", () => pm.expect(pm.response.json().availabilityStatus === \"MAINTENANCE\").to.be.true);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Reject deletion of a linked supplier",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 409', () => pm.response.to.have.status(409));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Remove equipment and stock",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/equipment/{{equipmentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify stock was removed",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/inventory/{{inventoryId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete unlinked supplier",
+          "request": {
+            "method": "DELETE",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 204', () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify supplier was removed",
+          "request": {
+            "method": "GET",
+            "url": "{{baseUrl}}/suppliers/{{supplierId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
   ]
 }

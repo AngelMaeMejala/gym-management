@@ -8,5 +8,8 @@ dist/
 .npm-cache/
 .gym-browser/
 .gym-uploads/
-postman/*Local*.postman_environment.json
+*.postman_environment.json
+/database/*.sql
+!/database/setup.sql
+!/database/schema.sql
 

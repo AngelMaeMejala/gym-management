@@ -6,9 +6,9 @@ Gym administrators and staff use the application to manage schedules, equipment,
 
 ## Run locally
 
-Prerequisites are Node.js 22.12+ and MySQL 8.0.16+. XAMPP MariaDB can also run the project locally.
+Install Node.js 22.12+ and MySQL 8.0.16+ or XAMPP MariaDB. The submission was verified on XAMPP MariaDB 10.11 with TCP port 3306.
 
-1. Start the database server. In a MySQL client or phpMyAdmin, run [database/setup.sql](database/setup.sql) to create `gym_management_db`.
+1. Start MySQL in the XAMPP Control Panel. In phpMyAdmin or a MySQL client, run [database/setup.sql](database/setup.sql) to create `gym_management_db`. On a fresh install, NestJS applies the full schema through TypeORM migrations. If you need to demonstrate a SQL import, select the empty database, import [database/schema.sql](database/schema.sql), and then start NestJS. The export contains table definitions and relationships only. Startup records the migrations and adds the fictional supplier examples.
 2. Run the following SQL as a database administrator. Replace the example password before running it. Use the same database username and password in your environment file.
 
    ```sql
@@ -17,7 +17,7 @@ Prerequisites are Node.js 22.12+ and MySQL 8.0.16+. XAMPP MariaDB can also run t
      ON gym_management_db.* TO 'gym_app'@'127.0.0.1';
    ```
 
-3. Copy [.env.example](.env.example) to `.env` in the project root. Set `DB_PASSWORD`, `JWT_SECRET`, `BOOTSTRAP_ADMIN_EMAIL`, and `BOOTSTRAP_ADMIN_PASSWORD`. Generate a secret with the following command. The administrator password must contain at least 8 characters and fit in 72 UTF-8 bytes.
+3. Copy [.env.example](.env.example) to `.env` in the project root. Keep `DB_HOST=127.0.0.1` and `DB_PORT=3306` for the default XAMPP setup. Set `DB_NAME`, `DB_USER`, and `DB_PASSWORD` to match your database and dedicated application account. Set `BOOTSTRAP_ADMIN_EMAIL`, `BOOTSTRAP_ADMIN_PASSWORD`, and `JWT_SECRET`. Generate the JWT secret with the command below. The administrator password must contain at least 8 characters and fit in 72 UTF-8 bytes.
 
    ```sh
    node -e "console.log(require('node:crypto').randomBytes(48).toString('hex'))"
@@ -30,7 +30,7 @@ Prerequisites are Node.js 22.12+ and MySQL 8.0.16+. XAMPP MariaDB can also run t
    npm run dev:api
    ```
 
-   Startup runs the TypeORM migration and creates the administrator when there is no active administrator. Changing the bootstrap password after initialization does not reset the administrator's password. Existing administrators can change account passwords in **Users**.
+   Startup runs pending migrations and creates the administrator when there is no active administrator. Changing the bootstrap password after initialization does not reset the administrator's password. Existing administrators can change account passwords in **Users**. NestJS listens on port 3000, and an anonymous request to `/api/v1/auth/me` should return `401`.
 
 5. In a second terminal, start the frontend.
 
@@ -38,9 +38,9 @@ Prerequisites are Node.js 22.12+ and MySQL 8.0.16+. XAMPP MariaDB can also run t
    npm run dev:web
    ```
 
-6. Open [http://localhost:5173](http://localhost:5173) and sign in with the administrator email and password you set. Use **Users** to create staff and member accounts.
+6. Open [http://localhost:5173](http://localhost:5173) and sign in with the administrator credentials you set. Vite proxies `/api/v1` to NestJS. Leave `VITE_API_URL` empty for local development. If you run the frontend at another origin, configure `CORS_ORIGIN` accordingly. Use **Users** to create staff and member accounts.
 
-On Windows PowerShell, use `npm.cmd` in place of `npm` if script execution is restricted.
+On Windows PowerShell, use `npm.cmd` or `npx.cmd` if script execution is restricted.
 
 The live workspace uses XAMPP on port 3306. An ignored local database under `.gym-db` is the retained source from before the move to XAMPP. It uses a separate data directory on port 3307. For recovery work, start that retained instance with the following command from the workspace.
 
@@ -83,6 +83,8 @@ erDiagram
     USERS ||--o{ INVENTORY : updates
     USERS ||--o{ NOTIFICATIONS : receives
     EQUIPMENT ||--o| INVENTORY : tracks
+    SUPPLIERS o|--o{ EQUIPMENT : supplies
+    USERS ||--o{ GYM_BOOKINGS : requests
     GYM_SCHEDULES o|--o{ NOTIFICATIONS : references
 ```
 
@@ -126,7 +128,13 @@ Supplier writes accept `supplierName`, `contactPerson`, `phone`, `email`, `addre
 
 ## Verify
 
-Import both JSON files in [postman](postman). Select the **Gym Management Local** environment, enter the administrator credentials in its local values, then run **Gym Management API** in collection order against a disposable database. The collection captures JWTs and resource IDs and checks the expected HTTP responses.
+Import the [Postman collection](postman/Gym%20Management.postman_collection.json) and run the folders in order against a disposable database. Set `baseUrl`, `adminEmail`, and `adminPassword` in a private Postman environment. For the upload request, select [the fictional PNG fixture](postman/fixtures/profile.png) if Postman asks for a local file. Newman resolves it from the project root.
+
+```powershell
+npx --yes newman run "postman/Gym Management.postman_collection.json" -e "postman/Local.postman_environment.json"
+```
+
+Export your private environment to the ignored path used in the command. The collection captures JWTs, creates temporary test records, and verifies successful and rejected requests across all 38 REST operations. The [testing report](TESTING_REPORT.md) records the verified submission results.
 
 For automated role, validation, concurrency, and persistence checks, start the API with `.env` configured for a disposable database, then run:
 
@@ -134,7 +142,7 @@ For automated role, validation, concurrency, and persistence checks, start the A
 node scripts/smoke-api.cjs
 ```
 
-Both workflows create records and deactivate their test accounts at the end. In-app notifications and deactivated accounts remain available for inspection in the database.
+Both workflows write test records. The Postman run removes its temporary equipment and supplier and deactivates the administrator-created member. Its self-registered member, booking history, image, and notifications remain in the disposable database.
 
 ## Build and configure
 
@@ -145,4 +153,4 @@ npm start
 
 NestJS compiles into `dist/api`. Vite builds into `dist/web`. When serving the built frontend, configure your static server to serve `index.html` for client-side routes. Set `VITE_API_URL` at frontend build time if the API address changes and set `CORS_ORIGIN` on the API to the frontend origin.
 
-Keep `.env`, local database files, and installed dependencies out of commits. The repository can be initialized with `git init` and pushed to GitHub with `package-lock.json` and `.env.example` included.
+Keep `.env`, private Postman environments, database backups, profile uploads, and installed dependencies out of Git. The shareable setup artifacts are the sanitized SQL files, `.env.example`, the collection, and the fictional upload fixture.
