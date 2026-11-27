@@ -2,7 +2,7 @@
   "info": {
     "name": "FitZone Gym Management API",
     "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json",
-    "description": "Run in order from the project root against a disposable database. Set adminEmail and adminPassword as private environment values. The collection creates test records and uploads a fictional fixture."
+    "description": "Run in order from the project root against a disposable database. Set adminEmail and adminPassword as private environment values. The collection creates test records and uploads a fictional fixture. On the existing gym database, send Administrator signs in individually and use only the Video demo - equipment CRUD folder."
   },
   "auth": {
     "type": "bearer",
@@ -122,7 +122,12 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 200', () => pm.response.to.have.status(200));",
-                  "pm.collectionVariables.set(\"adminToken\", pm.response.json().accessToken);",
+                  "pm.collectionVariables.unset(\"adminToken\");",
+                  "if (pm.response.code === 200) {",
+                  "  const token = pm.response.json().accessToken;",
+                  "  pm.test(\"JWT returned\", () => pm.expect(token).to.match(/^[^.]+\\.[^.]+\\.[^.]+$/));",
+                  "  if (token) pm.collectionVariables.set(\"adminToken\", token);",
+                  "}",
                   "pm.collectionVariables.set(\"run\", pm.variables.replaceIn(\"{{$guid}}\"));",
                   "pm.collectionVariables.set(\"memberPassword\", pm.variables.replaceIn(\"{{$guid}}\"));"
                 ]
@@ -1610,6 +1615,159 @@
                 "type": "text/javascript",
                 "exec": [
                   "pm.test('HTTP 404', () => pm.response.to.have.status(404));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "Video demo - equipment CRUD",
+      "description": "Send Administrator signs in first. This folder uses inherited administrator authorization and a separate demoEquipmentId. Run in order or send individual requests for the recording.",
+      "item": [
+        {
+          "name": "Reject equipment request without JWT",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/equipment",
+            "auth": {
+              "type": "noauth"
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Create Demo Treadmill",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/equipment",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipmentName\": \"Demo Treadmill\",\n  \"category\": \"Cardio\",\n  \"equipmentCondition\": \"GOOD\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 201\", () => pm.response.to.have.status(201));",
+                  "pm.collectionVariables.unset(\"demoEquipmentId\");",
+                  "if (pm.response.code === 201) pm.collectionVariables.set(\"demoEquipmentId\", pm.response.json().equipmentId);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Read Demo Treadmill",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/equipment/{{demoEquipmentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Update Demo Treadmill",
+          "request": {
+            "method": "PUT",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": "{{baseUrl}}/equipment/{{demoEquipmentId}}",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"equipmentName\": \"Demo Treadmill\",\n  \"category\": \"Cardio\",\n  \"equipmentCondition\": \"NEEDS_REPAIR\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            }
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Delete Demo Treadmill",
+          "request": {
+            "method": "DELETE",
+            "header": [],
+            "url": "{{baseUrl}}/equipment/{{demoEquipmentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "Verify Demo Treadmill is gone",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": "{{baseUrl}}/equipment/{{demoEquipmentId}}"
+          },
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTTP 404\", () => pm.response.to.have.status(404));"
                 ]
               }
             }
