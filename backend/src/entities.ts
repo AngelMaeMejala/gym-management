@@ -1,7 +1,8 @@
-import { Column, Entity, Index, JoinColumn, ManyToOne, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
+import { Column, Entity, Index, JoinColumn, ManyToOne, OneToMany, OneToOne, PrimaryGeneratedColumn } from 'typeorm';
 
 export enum Role { ADMIN = 'ADMIN', STAFF = 'STAFF', MEMBER = 'MEMBER' }
 export enum AccountStatus { ACTIVE = 'ACTIVE', INACTIVE = 'INACTIVE' }
+export enum SupplierStatus { ACTIVE = 'ACTIVE', INACTIVE = 'INACTIVE' }
 export enum ScheduleStatus { SCHEDULED = 'SCHEDULED', COMPLETED = 'COMPLETED', CANCELLED = 'CANCELLED' }
 export enum Condition { GOOD = 'GOOD', NEEDS_REPAIR = 'NEEDS_REPAIR', DAMAGED = 'DAMAGED' }
 export enum Availability { AVAILABLE = 'AVAILABLE', UNAVAILABLE = 'UNAVAILABLE', MAINTENANCE = 'MAINTENANCE' }
@@ -82,6 +83,13 @@ export class Equipment {
 
   @Column({ type: 'date' })
   dateAdded!: string;
+
+  @Column({ type: 'int', nullable: true })
+  supplierId!: number | null;
+
+  @ManyToOne(() => Supplier, supplier => supplier.equipment, { nullable: true, onDelete: 'RESTRICT' })
+  @JoinColumn({ name: 'supplierId' })
+  supplier!: Supplier | null;
 }
 
 @Entity('inventory')
@@ -197,4 +205,31 @@ export class Booking {
   updatedAt!: Date;
 }
 
-export const entities = [User, Schedule, Equipment, Inventory, Notification, Booking];
+@Entity('suppliers')
+export class Supplier {
+  @PrimaryGeneratedColumn()
+  supplierId!: number;
+
+  @Column({ type: 'varchar', length: 100, unique: true })
+  supplierName!: string;
+
+  @Column({ type: 'varchar', length: 100 })
+  email!: string;
+
+  @Column({ type: 'varchar', length: 30 })
+  phone!: string;
+
+  @Column({ type: 'varchar', length: 100, nullable: true })
+  contactPerson!: string | null;
+
+  @Column({ type: 'varchar', length: 255, nullable: true })
+  address!: string | null;
+
+  @Column({ type: 'enum', enum: SupplierStatus, default: SupplierStatus.ACTIVE })
+  status!: SupplierStatus;
+
+  @OneToMany(() => Equipment, equipment => equipment.supplier)
+  equipment!: Equipment[];
+}
+
+export const entities = [User, Schedule, Equipment, Inventory, Notification, Booking, Supplier];

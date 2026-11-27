@@ -3,7 +3,7 @@ import { FileInterceptor } from '@nestjs/platform-express';
 import { ProfilePictures, profilePictureLimit } from './profile-pictures';
 import type { PictureUpload } from './profile-pictures';
 import { Auth, Public, Roles } from './auth';
-import { BookingDecision, BookingInput, EquipmentInput, InventoryInput, Login, RegistrationInput, ScheduleInput, UserInput, UserUpdate } from './dto';
+import { BookingDecision, BookingInput, EquipmentInput, InventoryInput, Login, RegistrationInput, ScheduleInput, SupplierInput, UserInput, UserUpdate } from './dto';
 import { RegistrationLimit } from './registration-limit';
 import { Role, User } from './entities';
 import { Gym } from './gym';
@@ -35,6 +35,25 @@ export class Api {
   @Roles(Role.MEMBER)
   createBooking(@Body() input: BookingInput, @CurrentUser() user: User) {
     return this.gym.createBooking(input, user);
+  }
+
+  @Get('bookings/:id')
+  @Roles(Role.ADMIN, Role.MEMBER)
+  booking(@Id() id: number, @CurrentUser() user: User) {
+    return this.gym.booking(id, user);
+  }
+
+  @Put('bookings/:id')
+  @Roles(Role.MEMBER)
+  editBooking(@Id() id: number, @Body() input: BookingInput, @CurrentUser() user: User) {
+    return this.gym.saveBooking(input, user, id);
+  }
+
+  @Delete('bookings/:id')
+  @Roles(Role.MEMBER)
+  @HttpCode(204)
+  async removeBooking(@Id() id: number, @CurrentUser() user: User) {
+    await this.gym.cancelBooking(id, user);
   }
 
   @Patch('bookings/:id/decision')
@@ -101,6 +120,19 @@ export class Api {
     return this.gym.saveUser(input);
   }
 
+  @Get('users/:id')
+  @Roles(Role.ADMIN)
+  user(@Id() id: number) {
+    return this.gym.user(id);
+  }
+
+  @Delete('users/:id')
+  @Roles(Role.ADMIN)
+  @HttpCode(204)
+  deactivateMember(@Id() id: number) {
+    return this.gym.deactivateMember(id);
+  }
+
   @Put('users/:id')
   @Roles(Role.ADMIN)
   editUser(@Id() id: number, @Body() input: UserUpdate, @CurrentUser() user: User) {
@@ -110,6 +142,11 @@ export class Api {
   @Get('schedules')
   schedules(@CurrentUser() user: User) {
     return this.gym.schedules(user);
+  }
+
+  @Get('schedules/:id')
+  schedule(@Id() id: number, @CurrentUser() user: User) {
+    return this.gym.schedule(id, user);
   }
 
   @Post('schedules')
@@ -134,6 +171,11 @@ export class Api {
   @Get('equipment')
   equipment() {
     return this.gym.equipment();
+  }
+
+  @Get('equipment/:id')
+  equipmentRecord(@Id() id: number) {
+    return this.gym.equipmentRecord(id);
   }
 
   @Post('equipment')
@@ -161,10 +203,47 @@ export class Api {
     return this.gym.inventory();
   }
 
+  @Get('inventory/:id')
+  @Roles(Role.ADMIN, Role.STAFF)
+  stock(@Id() id: number) {
+    return this.gym.stock(id);
+  }
+
   @Patch('inventory/:id')
   @Roles(Role.ADMIN, Role.STAFF)
   updateInventory(@Id() id: number, @Body() input: InventoryInput, @CurrentUser() user: User) {
     return this.gym.updateInventory(id, input.quantity, user);
+  }
+
+  @Get('suppliers')
+  @Roles(Role.ADMIN)
+  suppliers() {
+    return this.gym.suppliers();
+  }
+
+  @Get('suppliers/:id')
+  @Roles(Role.ADMIN)
+  supplier(@Id() id: number) {
+    return this.gym.supplier(id);
+  }
+
+  @Post('suppliers')
+  @Roles(Role.ADMIN)
+  addSupplier(@Body() input: SupplierInput) {
+    return this.gym.saveSupplier(input);
+  }
+
+  @Put('suppliers/:id')
+  @Roles(Role.ADMIN)
+  editSupplier(@Id() id: number, @Body() input: SupplierInput) {
+    return this.gym.saveSupplier(input, id);
+  }
+
+  @Delete('suppliers/:id')
+  @Roles(Role.ADMIN)
+  @HttpCode(204)
+  removeSupplier(@Id() id: number) {
+    return this.gym.removeSupplier(id);
   }
 
   @Get('notifications')

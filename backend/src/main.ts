@@ -18,6 +18,8 @@ import { AddGymBookings1764000000000 } from './booking-migration';
 import { NormalizeEquipmentAvailability1764100000000 } from './equipment-availability-migration';
 import { AddProfilePicture1764200000000 } from './profile-picture-migration';
 import { ProfilePictures } from './profile-pictures';
+import { AddSuppliers1764300000000 } from './supplier-migration';
+import { LinkEquipmentToSuppliers1764400000000 } from './supplier-equipment-migration';
 
 const secret = process.env.JWT_SECRET;
 if (!secret || Buffer.byteLength(secret) < 32) throw new Error('Set JWT_SECRET to a random value of at least 32 bytes');
@@ -26,7 +28,7 @@ if (!secret || Buffer.byteLength(secret) < 32) throw new Error('Set JWT_SECRET t
   imports: [
     TypeOrmModule.forRoot({
       ...databaseOptions(),
-      migrations: [InitialSchema1760000000000, AddGymBookings1764000000000, NormalizeEquipmentAvailability1764100000000, AddProfilePicture1764200000000], migrationsRun: true,
+      migrations: [InitialSchema1760000000000, AddGymBookings1764000000000, NormalizeEquipmentAvailability1764100000000, AddProfilePicture1764200000000, AddSuppliers1764300000000, LinkEquipmentToSuppliers1764400000000], migrationsRun: true,
       retryAttempts: 2,
     }),
     JwtModule.register({ secret, signOptions: { expiresIn: '2h', algorithm: 'HS256' } }),

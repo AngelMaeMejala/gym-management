@@ -1,6 +1,6 @@
 import { Transform } from 'class-transformer';
 import { Allow, IsByteLength, IsEmail, IsEnum, IsIn, IsInt, IsISO8601, IsOptional, IsString, Length, Matches, Max, MaxLength, Min, ValidateIf } from 'class-validator';
-import { AccountStatus, Availability, BookingActivity, BookingStatus, Condition, Role, ScheduleStatus } from './entities';
+import { AccountStatus, Availability, BookingActivity, BookingStatus, Condition, Role, ScheduleStatus, SupplierStatus } from './entities';
 
 const trim = Transform(({ value }) => typeof value === 'string' ? value.trim() : value);
 const email = Transform(({ value }) => typeof value === 'string' ? value.trim().toLowerCase() : value);
@@ -78,11 +78,34 @@ export class EquipmentInput {
 
   @IsOptional() @IsEnum(Availability)
   availabilityStatus?: Availability;
+
+  @IsOptional() @IsInt() @Min(1) @Max(2147483647)
+  supplierId?: number | null;
 }
 
 export class InventoryInput {
   @IsInt() @Min(0) @Max(2147483647)
   quantity!: number;
+}
+
+export class SupplierInput {
+  @trim @IsString() @Length(1, 100)
+  supplierName!: string;
+
+  @email @IsEmail() @MaxLength(100)
+  email!: string;
+
+  @trim @IsString() @Length(3, 30) @Matches(/^\+?[\d(). -]*\d[\d(). -]*$/)
+  phone!: string;
+
+  @trim @IsString() @Length(1, 100)
+  contactPerson!: string;
+
+  @trim @IsString() @Length(1, 255)
+  address!: string;
+
+  @IsEnum(SupplierStatus)
+  status!: SupplierStatus;
 }
 
 export class BookingInput {

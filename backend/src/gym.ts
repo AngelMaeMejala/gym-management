@@ -1,8 +1,8 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { DataSource, EntityManager, Not, QueryFailedError } from 'typeorm';
 import { hash } from 'bcrypt';
-import { AccountStatus, Availability, Booking, BookingStatus, Delivery, Equipment, Inventory, Notification, Role, Schedule, ScheduleStatus, User } from './entities';
-import { BookingDecision, BookingInput, EquipmentInput, ScheduleInput, UserInput, UserUpdate } from './dto';
+import { AccountStatus, Availability, Booking, BookingStatus, Delivery, Equipment, Inventory, Notification, Role, Schedule, ScheduleStatus, Supplier, User } from './entities';
+import { BookingDecision, BookingInput, EquipmentInput, ScheduleInput, SupplierInput, UserInput, UserUpdate } from './dto';
 import { equipmentAvailability } from './equipment-availability';
 
 export function mysqlCode(error: unknown) {
@@ -34,6 +34,19 @@ export class Gym {
     return this.db.getRepository(User).find({ order: { firstName: 'ASC', lastName: 'ASC' } });
   }
 
+  async user(userId: number) {
+    const row = await this.db.getRepository(User).findOneBy({ userId });
+    if (!row) throw new NotFoundException('User not found');
+    return row;
+  }
+
+  async deactivateMember(userId: number) {
+    const result = await this.db.getRepository(User).update({ userId, role: Role.MEMBER }, {
+      accountStatus: AccountStatus.INACTIVE,
+    });
+    if (!result.affected) throw new NotFoundException('Member not found');
+  }
+
   async saveUser(input: UserInput | UserUpdate, id?: number, actor?: User) {
     const { password, ...fields } = input;
     const digest = password === undefined ? undefined : await hash(password, 12);
@@ -58,6 +71,12 @@ export class Gym {
 
   schedules(user: User) {
     return this.scheduleList(user.role === Role.MEMBER).getMany();
+  }
+
+  async schedule(scheduleId: number, user: User) {
+    const row = await this.scheduleList(user.role === Role.MEMBER).andWhere('s.scheduleId = :scheduleId', { scheduleId }).getOne();
+    if (!row) throw new NotFoundException('Schedule not found');
+    return row;
   }
 
   private scheduleList(upcoming: boolean) {
@@ -162,22 +181,39 @@ export class Gym {
   }
 
   createBooking(input: BookingInput, member: User) {
+    return this.saveBooking(input, member);
+  }
+
+  async booking(bookingId: number, user: User) {
+    const row = await this.db.getRepository(Booking).findOneBy({
+      bookingId, ...(user.role === Role.MEMBER && { memberId: user.userId }),
+    });
+    if (!row) throw new NotFoundException('Booking not found');
+    return row;
+  }
+
+  saveBooking(input: BookingInput, member: User, bookingId?: number) {
     const startTime = bookingTime(input.startTime);
     const endTime = bookingTime(input.endTime);
     if (startTime >= endTime) throw new BadRequestException('End time must be after start time');
     return this.scheduleTransaction(async manager => {
+      const existing = bookingId === undefined ? null : await manager.findOneBy(Booking, { bookingId, memberId: member.userId });
+      if (bookingId !== undefined && !existing) throw new NotFoundException('Booking not found');
+      if (existing && existing.status !== BookingStatus.PENDING) throw new ConflictException('Only pending requests can be edited');
       assertFutureSlot(input.bookingDate, startTime);
-      const duplicate = await this.bookingSlot(manager, input.bookingDate, startTime, endTime)
+      const overlapping = this.bookingSlot(manager, input.bookingDate, startTime, endTime)
         .andWhere('b.memberId = :memberId AND b.status IN (:...active)', {
           memberId: member.userId, active: [BookingStatus.PENDING, BookingStatus.APPROVED],
-        }).getExists();
-      if (duplicate) throw new ConflictException('You already have a booking request or approved booking that overlaps this time');
+        });
+      if (existing) overlapping.andWhere('b.bookingId <> :bookingId', { bookingId });
+      if (await overlapping.getExists()) throw new ConflictException('You already have a booking request or approved booking that overlaps this time');
       await this.assertBookingCapacity(manager, input.bookingDate, startTime, endTime);
       const now = new Date();
       return manager.save(Booking, {
+        ...existing,
         activity: input.activity, bookingDate: input.bookingDate, startTime, endTime,
         memberId: member.userId, notes: input.notes || null, rejectionReason: null,
-        status: BookingStatus.PENDING, createdAt: now, updatedAt: now,
+        status: BookingStatus.PENDING, createdAt: existing?.createdAt ?? now, updatedAt: now,
       });
     });
   }
@@ -229,25 +265,31 @@ export class Gym {
   }
 
   async saveEquipment(input: EquipmentInput, user: User, id?: number) {
-    const { equipmentName, category, equipmentCondition } = input;
-    return this.db.transaction(async manager => {
-      const repo = manager.getRepository(Equipment);
-      if (id !== undefined) {
-        const equipment = await this.lockEquipment(manager, id);
-        const stock = await manager.findOneBy(Inventory, { equipmentId: id });
-        return repo.save({
-          ...equipment, equipmentName, category, equipmentCondition,
-          availabilityStatus: equipmentAvailability(equipmentCondition, stock?.quantity ?? 0),
+    const { equipmentName, category, equipmentCondition, supplierId } = input;
+    const fields = { equipmentName, category, equipmentCondition, ...(supplierId !== undefined && { supplierId }) };
+    try {
+      return await this.db.transaction(async manager => {
+        const repo = manager.getRepository(Equipment);
+        if (id !== undefined) {
+          const equipment = await this.lockEquipment(manager, id);
+          const stock = await manager.findOneBy(Inventory, { equipmentId: id });
+          return repo.save({
+            ...equipment, ...fields,
+            availabilityStatus: equipmentAvailability(equipmentCondition, stock?.quantity ?? 0),
+          });
+        }
+        const { date: dateAdded } = manilaNow();
+        const equipment = await repo.save({
+          supplierId: null, ...fields, dateAdded,
+          availabilityStatus: equipmentAvailability(equipmentCondition, 0),
         });
-      }
-      const { date: dateAdded } = manilaNow();
-      const equipment = await repo.save({
-        equipmentName, category, equipmentCondition, dateAdded,
-        availabilityStatus: equipmentAvailability(equipmentCondition, 0),
+        await manager.insert(Inventory, { equipmentId: equipment.equipmentId, quantity: 0, lastUpdated: new Date(), updatedByUserId: user.userId });
+        return equipment;
       });
-      await manager.insert(Inventory, { equipmentId: equipment.equipmentId, quantity: 0, lastUpdated: new Date(), updatedByUserId: user.userId });
-      return equipment;
-    });
+    } catch (error) {
+      if (mysqlCode(error) === 'ER_NO_REFERENCED_ROW_2') throw new BadRequestException('Selected supplier does not exist');
+      throw error;
+    }
   }
 
   async removeEquipment(id: number) {
@@ -256,7 +298,62 @@ export class Gym {
   }
 
   inventory() {
-    return this.db.getRepository(Inventory).find({ relations: { equipment: true }, order: { quantity: 'ASC' } });
+    return this.inventoryWithEquipment().orderBy('stock.quantity', 'ASC').getMany();
+  }
+
+  async stock(inventoryId: number) {
+    const row = await this.inventoryWithEquipment().where('stock.inventoryId = :inventoryId', { inventoryId }).getOne();
+    if (!row) throw new NotFoundException('Inventory record not found');
+    return row;
+  }
+
+  private inventoryWithEquipment() {
+    return this.db.getRepository(Inventory).createQueryBuilder('stock')
+      .leftJoinAndSelect('stock.equipment', 'equipment')
+      .leftJoin('equipment.supplier', 'supplier')
+      .addSelect(['supplier.supplierId', 'supplier.supplierName']);
+  }
+
+  async equipmentRecord(equipmentId: number) {
+    const row = await this.db.getRepository(Equipment).findOneBy({ equipmentId });
+    if (!row) throw new NotFoundException('Equipment not found');
+    const stock = await this.db.getRepository(Inventory).findOneBy({ equipmentId });
+    return { ...row, quantity: stock?.quantity ?? null };
+  }
+
+  suppliers() {
+    return this.db.getRepository(Supplier).find({ order: { supplierName: 'ASC' } });
+  }
+
+  async supplier(supplierId: number) {
+    const row = await this.db.getRepository(Supplier).findOneBy({ supplierId });
+    if (!row) throw new NotFoundException('Supplier not found');
+    return row;
+  }
+
+  async saveSupplier(input: SupplierInput, supplierId?: number) {
+    const repo = this.db.getRepository(Supplier);
+    try {
+      if (supplierId === undefined) return await repo.save(repo.create(input));
+      const result = await repo.update(supplierId, input);
+      if (!result.affected) throw new NotFoundException('Supplier not found');
+      return await this.supplier(supplierId);
+    } catch (error) {
+      if (mysqlCode(error) === 'ER_DUP_ENTRY') throw new ConflictException('Supplier name already exists');
+      throw error;
+    }
+  }
+
+  async removeSupplier(supplierId: number) {
+    try {
+      const result = await this.db.getRepository(Supplier).delete(supplierId);
+      if (!result.affected) throw new NotFoundException('Supplier not found');
+    } catch (error) {
+      if (mysqlCode(error) === 'ER_ROW_IS_REFERENCED_2') {
+        throw new ConflictException('Reassign or clear this supplier from its equipment before deleting it.');
+      }
+      throw error;
+    }
   }
 
   async updateInventory(id: number, quantity: number, actor: User) {

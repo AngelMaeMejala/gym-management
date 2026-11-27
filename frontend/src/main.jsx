@@ -5,7 +5,9 @@ import axios from 'axios';
 import { Bell, BicepsFlexed, Bike, Box, CalendarDays, Camera, Check, CircleAlert, CircleUserRound, ClipboardList, createLucideIcon, Dumbbell, Eye, EyeOff, Footprints, HeartPulse, LayoutDashboard, LoaderCircle, LockKeyhole, LogIn, LogOut, Mail, Medal, Pencil, Plus, Search, Timer, Trash2, Users, X } from 'lucide-react';
 import './style.css';
 
-const api = axios.create({ baseURL: import.meta.env.VITE_API_URL || 'http://localhost:3000/api/v1' });
+const api = axios.create({
+  baseURL: import.meta.env.VITE_API_URL || (import.meta.env.DEV ? '/api/v1' : 'http://localhost:3000/api/v1'),
+});
 const sessionKey = 'gym-access-token';
 api.interceptors.request.use(config => {
   const token = sessionStorage.getItem(sessionKey);
@@ -63,8 +65,19 @@ const catalog = {
   inventory: {
     title: 'Inventory', item: 'quantity', icon: Box, id: 'inventoryId',
     fields: [['quantity', 'Quantity', 'number']],
-    columns: [['Equipment', r => r.equipment.equipmentName], ['Category', r => r.equipment.category], ['Quantity', r => r.quantity], ['Availability', r => badge(r.equipment.availabilityStatus)], ['Last updated', r => dateTime(r.lastUpdated)]],
-    search: r => [r.equipment.equipmentName, r.equipment.category, r.quantity, label(r.equipment.availabilityStatus)],
+    columns: [['Equipment', r => r.equipment.equipmentName], ['Category', r => r.equipment.category], ['Supplier', r => r.equipment.supplier?.supplierName ?? 'Unassigned'], ['Quantity', r => r.quantity], ['Availability', r => badge(r.equipment.availabilityStatus)], ['Last updated', r => dateTime(r.lastUpdated)]],
+    search: r => [r.equipment.equipmentName, r.equipment.category, r.equipment.supplier?.supplierName ?? 'Unassigned', r.quantity, label(r.equipment.availabilityStatus)],
+  },
+  suppliers: {
+    title: 'Suppliers', item: 'supplier', icon: Box, id: 'supplierId',
+    fields: [['supplierName', 'Supplier name', 'text', 100], ['contactPerson', 'Contact person', 'text', 100],
+      ['phone', 'Contact number', 'tel', 30], ['email', 'Email address', 'email', 100], ['address', 'Address', 'text', 255],
+      ['status', 'Status', ['ACTIVE', 'INACTIVE']]],
+    defaults: () => ({ status: 'ACTIVE' }),
+    columns: [['Supplier', r => r.supplierName], ['Contact person', r => r.contactPerson ?? '—'],
+      ['Contact number', r => r.phone], ['Email address', r => r.email], ['Address', r => r.address ?? '—'],
+      ['Status', r => badge(r.status)]],
+    search: r => [r.supplierName, r.contactPerson ?? '', r.email, r.phone, r.address ?? '', label(r.status)],
   },
   users: {
     title: 'Users', item: 'user', icon: Users, id: 'userId',
@@ -83,6 +96,7 @@ function useResource(path) {
   const [state, setState] = useState({ loading: true });
   const [version, setVersion] = useState(0);
   useEffect(() => {
+    if (!path) return;
     const controller = new AbortController();
     setState(previous => ({ ...previous, loading: true, error: '' }));
     api.get(path, { signal: controller.signal }).then(({ data }) => setState({ data, loading: false })).catch(error => {
@@ -246,7 +260,7 @@ function Registration() {
 }
 
 function ReadState({ resource }) {
-  if (resource.error) return <div className="error" role="alert">{resource.error} <button onClick={resource.refresh}>Retry</button></div>;
+  if (resource.error) return <div className="error" role="alert">{resource.error} <button type="button" onClick={resource.refresh}>Retry</button></div>;
   if (resource.loading) return <div className="empty" role="status">Loading…</div>;
   return null;
 }
@@ -270,6 +284,7 @@ function Dialog({ title, onClose, busy, children }) {
 
 function Editor({ config, kind, record, onClose, onSave }) {
   const [values, setValues] = useState(() => record ? Object.fromEntries(config.fields.map(([key]) => [key, record[key] ?? ''])) : config.defaults());
+  const suppliers = useResource(kind === 'equipment' ? '/suppliers' : null);
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   async function submit(event) {
@@ -302,10 +317,21 @@ function Editor({ config, kind, record, onClose, onSave }) {
               max={type === 'number' ? 2147483647 : undefined} step={type === 'time' ? 1 : undefined}/>}
         </label>;
       })}
-      {kind === 'equipment' && <label>Availability
+      {kind === 'equipment' && <><label>Supplier
+        <select value={Object.hasOwn(values, 'supplierId') ? values.supplierId ?? '' : record?.supplierId ?? ''}
+          disabled={suppliers.loading || !!suppliers.error}
+          onChange={event => setValues({ ...values, supplierId: event.target.value ? Number(event.target.value) : null })}>
+          <option value="">{suppliers.loading ? 'Loading suppliers…' : 'Unassigned'}</option>
+          {suppliers.data?.map(supplier => <option key={supplier.supplierId} value={supplier.supplierId}>
+            {supplier.supplierName}{supplier.status === 'INACTIVE' ? ' (Inactive)' : ''}
+          </option>)}
+        </select>
+      </label>
+      {suppliers.error && <ReadState resource={suppliers}/>}
+      <label>Availability
         <input readOnly value={label(derivedAvailability(values.equipmentCondition, record?.quantity ?? 0))}/>
         <small>Calculated from condition and inventory quantity.</small>
-      </label>}
+      </label></>}
       <div className="dialog-actions"><button type="button" onClick={onClose} disabled={busy}>Cancel</button><button className="primary" disabled={busy}>{busy ? 'Saving…' : 'Save changes'}</button></div>
     </form>
   </Dialog>;
@@ -327,7 +353,7 @@ function Records({ kind, user, onProfileChange }) {
   const staff = user.role === 'STAFF';
   const add = (admin && kind !== 'inventory') || (staff && kind === 'schedules');
   const editable = admin || (staff && ['schedules', 'inventory'].includes(kind));
-  const deletable = admin && ['schedules', 'equipment'].includes(kind);
+  const deletable = admin && ['schedules', 'equipment', 'suppliers'].includes(kind);
   const records = resource.data || [];
   const equipmentView = kind === 'equipment';
   const member = user.role === 'MEMBER';
@@ -370,7 +396,7 @@ function Records({ kind, user, onProfileChange }) {
   }
 
   return <>
-    <div className="page-heading"><div><h1>{title}</h1><p>{({ schedules: 'Browse gym activities and their scheduled times.', equipment: 'Check equipment quantity, condition, and availability.', inventory: 'Review stock levels and update quantities.', users: 'Manage account roles and access.' })[kind]}</p></div>
+    <div className="page-heading"><div><h1>{title}</h1><p>{({ schedules: 'Browse gym activities and their scheduled times.', equipment: 'Check equipment quantity, condition, and availability.', inventory: 'Review stock levels and update quantities.', users: 'Manage account roles and access.', suppliers: 'Manage supplier contact information.' })[kind]}</p></div>
       {add && <button className="primary" onClick={() => setEditor({})}><Plus size={18}/> Add {config.item}</button>}</div>
     <section className="panel"><div className="toolbar"><label className="search"><Search size={18}/><input aria-label={'Search ' + config.title.toLowerCase()} placeholder={'Search ' + config.title.toLowerCase() + '…'} value={search} onChange={event => setSearch(event.target.value)}/></label>
       {equipmentView && <select className="equipment-category" aria-label="Filter by category" value={activeCategory} onChange={event => setCategory(event.target.value)}>
@@ -386,11 +412,17 @@ function Records({ kind, user, onProfileChange }) {
       <ReadState resource={resource}/>
       {!resource.loading && !resource.error && <Table columns={config.columns} rows={rows} id={config.id}
         actions={memberSchedules ? row => <button onClick={() => setDetails(row)}>View details</button> : editable ? row => <>
+          {kind === 'suppliers' && <button onClick={() => setDetails(row)}>View details</button>}
           {(admin || kind !== 'schedules' || row.createdByUserId === user.userId) && <button className="icon-button" aria-label={'Edit record ' + row[config.id]} onClick={() => setEditor({ record: row })}><Pencil size={17}/></button>}
           {deletable && <button className="icon-button danger-text" aria-label={'Delete record ' + row[config.id]} onClick={() => { setError(''); setRemove(row); }}><Trash2 size={17}/></button>}
         </> : undefined}/>}
     </section>
-    {details && <Dialog title={details.activityName} onClose={() => setDetails(null)}>
+    {details && kind === 'suppliers' && <Dialog title={details.supplierName} onClose={() => setDetails(null)}>
+      <dl className="member-details">
+        {config.columns.slice(1).map(([heading, display]) => <div key={heading}><dt>{heading}</dt><dd>{display(details)}</dd></div>)}
+      </dl>
+    </Dialog>}
+    {details && kind === 'schedules' && <Dialog title={details.activityName} onClose={() => setDetails(null)}>
       <dl className="member-details">
         <div><dt>Date</dt><dd>{date(details.scheduleDate)}</dd></div>
         <div><dt>Start time</dt><dd>{time(details.startTime)}</dd></div>
@@ -400,7 +432,7 @@ function Records({ kind, user, onProfileChange }) {
     </Dialog>}
     {editor && <Editor config={config} kind={kind} record={editor.record} onClose={() => setEditor(null)} onSave={save}/>}
     {remove && <Dialog title={'Delete ' + config.item + '?'} busy={removing} onClose={() => setRemove(null)}>
-      <p>{remove.activityName || remove.equipmentName}{kind === 'equipment' && ' and its inventory record'} will be removed.</p>
+      <p>{remove.activityName || remove.equipmentName || remove.supplierName}{kind === 'equipment' && ' and its inventory record'} will be removed.</p>
       {error && <p className="error" role="alert">{error}</p>}
       <div className="dialog-actions"><button disabled={removing} onClick={() => setRemove(null)}>Cancel</button><button className="danger" disabled={removing} onClick={confirmDelete}>{removing ? 'Deleting…' : 'Delete'}</button></div>
     </Dialog>}
@@ -575,7 +607,7 @@ function Workspace({ user, signOut, onProfileChange }) {
   const pages = [
     ['', 'Dashboard', LayoutDashboard], ['schedules', 'Schedules', CalendarDays], ['equipment', 'Equipment', Dumbbell],
     ...(user.role !== 'MEMBER' ? [['inventory', 'Inventory', ClipboardList]] : []),
-    ...(user.role === 'ADMIN' ? [['bookings', 'Booking Requests', ClipboardList], ['users', 'Users', Users]] : []),
+    ...(user.role === 'ADMIN' ? [['suppliers', 'Suppliers', Box], ['bookings', 'Booking Requests', ClipboardList], ['users', 'Users', Users]] : []),
     ['notifications', 'Notifications', Bell], ['account', 'My account', CircleUserRound],
   ];
   return <div className="workspace"><aside className="sidebar"><Brand/>

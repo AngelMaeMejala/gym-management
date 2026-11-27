@@ -13,7 +13,8 @@ Prerequisites are Node.js 22.12+ and MySQL 8.0.16+. XAMPP MariaDB can also run t
 
    ```sql
    CREATE USER 'gym_app'@'127.0.0.1' IDENTIFIED BY 'replace-with-a-strong-password';
-   GRANT ALL PRIVILEGES ON gym_management_db.* TO 'gym_app'@'127.0.0.1';
+   GRANT SELECT, INSERT, UPDATE, DELETE, CREATE, ALTER, INDEX, REFERENCES
+     ON gym_management_db.* TO 'gym_app'@'127.0.0.1';
    ```
 
 3. Copy [.env.example](.env.example) to `.env` in the project root. Set `DB_PASSWORD`, `JWT_SECRET`, `BOOTSTRAP_ADMIN_EMAIL`, and `BOOTSTRAP_ADMIN_PASSWORD`. Generate a secret with the following command. The administrator password must contain at least 8 characters and fit in 72 UTF-8 bytes.
@@ -41,7 +42,7 @@ Prerequisites are Node.js 22.12+ and MySQL 8.0.16+. XAMPP MariaDB can also run t
 
 On Windows PowerShell, use `npm.cmd` in place of `npm` if script execution is restricted.
 
-This workspace also contains an ignored local database under `.gym-db` if it was provisioned during setup. Its port and administrator sign-in values are in the ignored `.env`. To restart that specific XAMPP database after it has stopped, run the following from this workspace.
+The live workspace uses XAMPP on port 3306. An ignored local database under `.gym-db` is the retained source from before the move to XAMPP. It uses a separate data directory on port 3307. For recovery work, start that retained instance with the following command from the workspace.
 
 ```powershell
 & 'C:/xampp/mysql/bin/mysqld.exe' "--defaults-file=$((Resolve-Path .gym-db/my.ini).Path)" --bind-address=127.0.0.1 --port=3307
@@ -58,6 +59,7 @@ This workspace also contains an ignored local database under `.gym-db` if it was
 | View equipment availability | Yes | Yes | Yes |
 | Create, edit, and delete equipment | Yes | — | — |
 | View and update inventory | Yes | Yes | — |
+| Manage suppliers | Yes | — | — |
 | Create accounts, edit roles, set passwords, deactivate accounts | Yes | — | — |
 | View and mark own notifications as read | Yes | Yes | Yes |
 
@@ -84,7 +86,7 @@ erDiagram
     GYM_SCHEDULES o|--o{ NOTIFICATIONS : references
 ```
 
-The five tables are defined by [the TypeORM entities](backend/src/entities.ts) and [the initial migration](backend/src/migration.ts). Users, equipment, and schedules have independent primary keys. Inventory has a unique equipment foreign key. Notifications retain their message when the referenced schedule is deleted. Schedule writes use serializable transactions to protect the overlap check from concurrent writes. Passwords are hashed with bcrypt and excluded from normal queries. The API verifies JWTs and reads the current account status and role on every authenticated request.
+The database tables are defined by [the TypeORM entities](backend/src/entities.ts) and migrations under [backend/src](backend/src). Inventory has a unique equipment foreign key. Notifications retain their message when the referenced schedule is deleted. Schedule and booking writes use serializable transactions to protect the overlap checks from concurrent writes. Passwords are hashed with bcrypt and excluded from normal queries. The API verifies JWTs and reads the current account status and role on every authenticated request.
 
 ## REST API
 
@@ -92,23 +94,35 @@ Base URL is `http://localhost:3000/api/v1`. Log in with JSON containing `email` 
 
 | Method | Path | Access |
 | --- | --- | --- |
-| POST | /auth/login | Public |
+| POST | /auth/login, /auth/register | Public |
 | GET | /auth/me, /dashboard | Authenticated |
+| GET, POST | /auth/me/profile-picture | Member, own picture |
 | GET, POST | /users | Administrator |
+| GET | /users/:id | Administrator |
 | PUT | /users/:id | Administrator, password optional on update |
-| GET | /schedules | Authenticated, results depend on role |
+| DELETE | /users/:id | Administrator, deactivates member accounts and preserves their history |
+| GET | /schedules, /schedules/:id | Authenticated, results depend on role |
 | POST | /schedules | Administrator, staff |
 | PUT | /schedules/:id | Administrator, staff own records |
 | DELETE | /schedules/:id | Administrator |
-| GET | /equipment | Authenticated |
+| GET | /bookings, /bookings/:id | Administrator, member own records |
+| POST | /bookings | Member |
+| PUT | /bookings/:id | Member, own pending request |
+| DELETE, PATCH | /bookings/:id (DELETE), /bookings/:id/cancel (PATCH) | Member, cancels eligible own bookings and preserves history |
+| PATCH | /bookings/:id/decision | Administrator |
+| GET | /equipment, /equipment/:id | Authenticated |
 | POST | /equipment | Administrator |
 | PUT, DELETE | /equipment/:id | Administrator |
-| GET | /inventory | Administrator, staff |
+| GET | /inventory, /inventory/:id | Administrator, staff |
 | PATCH | /inventory/:id | Administrator, staff |
+| GET, POST | /suppliers | Administrator |
+| GET, PUT, DELETE | /suppliers/:id | Administrator |
 | GET | /notifications | Authenticated, own records |
 | PATCH | /notifications/:id/read | Authenticated, own records |
 
 Successful creates return `201`. Deletes return `204`. Invalid input returns `400`, missing or invalid credentials return `401`, and forbidden operations return `403`. Missing records return `404`, and duplicate emails or schedule conflicts return `409`.
+
+Supplier writes accept `supplierName`, `contactPerson`, `phone`, `email`, `address`, and `status` (`ACTIVE` or `INACTIVE`). Equipment writes accept an optional `supplierId`. Omit the field to keep the current assignment, or send `null` to clear it. Existing equipment starts unassigned. Inventory returns the assigned supplier's ID and name. Deleting a supplier linked to equipment returns `409`, so reassign or clear those links first.
 
 ## Verify
 
