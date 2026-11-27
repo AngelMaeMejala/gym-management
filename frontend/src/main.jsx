@@ -439,7 +439,7 @@ function Records({ kind, user, onProfileChange }) {
   </>;
 }
 
-function Dashboard({ user }) {
+function Dashboard({ user, unread }) {
   const resource = useResource('/dashboard');
   const data = resource.data;
   return <>
@@ -447,15 +447,15 @@ function Dashboard({ user }) {
     <ReadState resource={resource}/>
     {data && <><div className={user.role === 'ADMIN' ? 'stats admin-stats' : 'stats'}>
       {user.role === 'ADMIN' && <NavLink className="stat booking-pending-link" to="/bookings"><span className="stat-icon"><ClipboardList size={21}/></span><div><p>Booking requests</p><strong>{data.pendingBookings}</strong><p>Pending approval</p></div></NavLink>}
-      {[[CalendarDays, 'Upcoming schedules', data.scheduled], [Dumbbell, 'Equipment records', data.equipment], [Box, 'Available equipment', data.available], [Bell, 'Unread notifications', data.unread]].map(([Icon, title, value]) => <section className="stat" key={title}><span className="stat-icon"><Icon size={21}/></span><div><p>{title}</p><strong>{value}</strong></div></section>)}
+      {[[CalendarDays, 'Upcoming schedules', data.scheduled], [Dumbbell, 'Equipment records', data.equipment], [Box, 'Available equipment', data.available], [Bell, 'Unread notifications', unread ?? data.unread]].map(([Icon, title, value]) => <section className="stat" key={title}><span className="stat-icon"><Icon size={21}/></span><div><p>{title}</p><strong>{value}</strong></div></section>)}
     </div><section className="panel"><div className="section-heading"><div><h2>Upcoming activities</h2><p>The next scheduled sessions at the gym.</p></div><NavLink className="button" to="/schedules">View schedules</NavLink></div>
       <Table columns={catalog.schedules.columns} rows={data.upcoming} id="scheduleId"/>
     </section></>}
   </>;
 }
 
-function useNotificationInbox() {
-  const resource = useResource('/notifications');
+function useNotificationInbox(enabled = true) {
+  const resource = useResource(enabled ? '/notifications' : null);
   const [pending, setPending] = useState(null);
   const [error, setError] = useState('');
   async function read(id) {
@@ -471,7 +471,8 @@ function useNotificationInbox() {
       setPending(null);
     }
   }
-  return { resource, pending, error, read };
+  const unread = resource.data?.filter(row => row.deliveryStatus !== 'READ').length;
+  return { resource, pending, error, read, unread };
 }
 
 function NotificationFeed({ inbox, member = false, limit }) {
@@ -604,21 +605,27 @@ function MemberAccount({ user, picture, onPictureSaved }) {
 }
 
 function Workspace({ user, signOut, onProfileChange }) {
+  const admin = user.role === 'ADMIN';
+  const inbox = useNotificationInbox(admin);
   const pages = [
     ['', 'Dashboard', LayoutDashboard], ['schedules', 'Schedules', CalendarDays], ['equipment', 'Equipment', Dumbbell],
     ...(user.role !== 'MEMBER' ? [['inventory', 'Inventory', ClipboardList]] : []),
-    ...(user.role === 'ADMIN' ? [['suppliers', 'Suppliers', Box], ['bookings', 'Booking Requests', ClipboardList], ['users', 'Users', Users]] : []),
-    ['notifications', 'Notifications', Bell], ['account', 'My account', CircleUserRound],
+    ...(admin ? [['suppliers', 'Suppliers', Box], ['bookings', 'Booking Requests', ClipboardList], ['users', 'Users', Users]] : [['notifications', 'Notifications', Bell]]),
+    ['account', 'My account', CircleUserRound],
   ];
+  const profile = <><span className="avatar">{user.firstName[0]}{user.lastName[0]}</span><span><strong>{user.firstName} {user.lastName}</strong><small>{label(user.role)}</small></span></>;
   return <div className="workspace"><aside className="sidebar"><Brand/>
     <nav aria-label="Main navigation">{pages.map(([path, title, Icon]) => <NavLink key={path} to={'/' + path} end><Icon size={19}/>{title}</NavLink>)}</nav>
     <div className="sidebar-footer"><button onClick={signOut}><LogOut size={19}/>Sign out</button></div>
-  </aside><div className="work-area"><header className="topbar"><span>Gym workspace</span><NavLink to="/account" className="identity"><span className="avatar">{user.firstName[0]}{user.lastName[0]}</span><span><strong>{user.firstName} {user.lastName}</strong><small>{label(user.role)}</small></span></NavLink></header>
+  </aside><div className="work-area"><header className="topbar"><span>Gym workspace</span>
+    {admin ? <NotificationHeaderActions inbox={inbox} profilePath="/account" notificationsPath="/notifications">{profile}</NotificationHeaderActions> :
+      <NavLink to="/account" className="identity">{profile}</NavLink>}
+    </header>
     <main className="content"><Routes>
-      <Route index element={<Dashboard user={user}/>}/>
+      <Route index element={<Dashboard user={user} unread={inbox.unread}/>}/>
       {user.role === 'ADMIN' && <Route path="bookings" element={<BookingPage user={user}/>}/>}
       {pages.filter(([path]) => catalog[path]).map(([path]) => <Route key={path} path={path} element={<Records key={path} kind={path} user={user} onProfileChange={onProfileChange}/>}/>)}
-      <Route path="notifications" element={<Notifications/>}/><Route path="account" element={<Account user={user}/>}/>
+      <Route path="notifications" element={admin ? <NotificationPage inbox={inbox} member/> : <Notifications/>}/><Route path="account" element={<Account user={user}/>}/>
       <Route path="*" element={<Navigate to="/" replace/>}/>
     </Routes></main></div></div>;
 }
@@ -791,11 +798,11 @@ function MemberDashboard({ bookings, openDetails }) {
   </>;
 }
 
-function MemberHeader({ name, picture, inbox }) {
+function NotificationHeaderActions({ inbox, profilePath, notificationsPath, children }) {
   const [open, setOpen] = useState(false);
   const actions = useRef(null);
   const bell = useRef(null);
-  const unread = inbox.resource.data?.filter(row => row.deliveryStatus !== 'READ').length ?? 0;
+  const unread = inbox.unread ?? 0;
 
   useEffect(() => {
     if (!open) return;
@@ -821,9 +828,7 @@ function MemberHeader({ name, picture, inbox }) {
     setOpen(!open);
   }
 
-  return <header className="topbar">
-    <span>Member portal</span>
-    <div className="member-header-actions" ref={actions}>
+  return <div className="member-header-actions" ref={actions}>
       <button type="button" className="member-bell" ref={bell} onClick={toggle}
         aria-label={unread ? `Notifications, ${unread} unread` : 'Notifications'}
         aria-expanded={open} aria-controls={open ? 'member-notification-dropdown' : undefined}>
@@ -833,18 +838,17 @@ function MemberHeader({ name, picture, inbox }) {
       {open && <section id="member-notification-dropdown" className="member-notification-dropdown panel" aria-labelledby="member-notification-title">
         <div className="section-heading"><h2 id="member-notification-title">Notifications</h2></div>
         <div className="member-notification-feed"><NotificationFeed inbox={inbox} member limit={5}/></div>
-        <div className="member-notification-footer"><NavLink to="/member/notifications" onClick={() => setOpen(false)}>View all notifications</NavLink></div>
+        <div className="member-notification-footer"><NavLink to={notificationsPath} onClick={() => setOpen(false)}>View all notifications</NavLink></div>
       </section>}
-      <NavLink to={memberHome} className="identity" onClick={() => setOpen(false)}>
-        <MemberAvatar name={name} picture={picture}/>
-        <span><strong>{name}</strong><small>Member</small></span>
+      <NavLink to={profilePath} className="identity" onClick={() => setOpen(false)}>
+        {children}
       </NavLink>
-    </div>
-  </header>;
+    </div>;
 }
 
 function MemberWorkspace({ user, signOut }) {
   const inbox = useNotificationInbox();
+  const name = memberFirstName(user);
   const [avatar, setAvatar] = useState(null);
   const picture = useObjectUrl(avatar);
   const pictureSaved = useRef(false);
@@ -867,7 +871,12 @@ function MemberWorkspace({ user, signOut }) {
       <div className="sidebar-footer"><button onClick={signOut}><LogOut size={19} aria-hidden="true"/>Logout</button></div>
     </aside>
     <div className="work-area">
-      <MemberHeader name={memberFirstName(user)} picture={picture} inbox={inbox}/>
+      <header className="topbar"><span>Member portal</span>
+        <NotificationHeaderActions inbox={inbox} profilePath={memberHome} notificationsPath="/member/notifications">
+          <MemberAvatar name={name} picture={picture}/>
+          <span><strong>{name}</strong><small>Member</small></span>
+        </NotificationHeaderActions>
+      </header>
       <main className="content"><Routes>
         <Route index element={<Navigate to={memberHome} replace/>}/>
         <Route path="dashboard" element={<BookingPage user={user} home/>}/>
